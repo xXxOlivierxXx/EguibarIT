@@ -720,9 +720,15 @@
             New-Variable -Name "$('{0}{1}{2}' -f $NC['sl'], $NC['Delim'], $node.Name)" -Value (New-AdDelegatedGroup @parameters) -Force
         }
 
+        # Array to store all Privileged groups
+        $AllGroups = @()
+
         # Iterate through all Admin-GlobalGroups child nodes
         Foreach($node in $confXML.n.Admin.GG.ChildNodes) {
+            
             Write-Verbose -Message ('Create group {0}' -f ('{0}{1}{2}' -f $NC['sg'], $NC['Delim'], $node.Name))
+            $AllGroups += '{0}' -f ('{0}{1}{2}' -f $NC['sg'], $NC['Delim'], $node.Name) #Append admin groups to array
+            
             $parameters = @{
                 Name                          = '{0}{1}{2}' -f $NC['sg'], $NC['Delim'], $node.Name
                 GroupCategory                 = 'Security'
@@ -796,34 +802,17 @@
         }
         New-Variable -Name "$('{0}{1}{2}' -f $NC['sl'], $NC['Delim'], $confXML.n.Servers.LG.SvrAdmRight.Name)" -Value (New-AdDelegatedGroup @parameters) -Force
 
-
-
-        # Get all Privileged groups into an array
-        $AllGroups = @(
-            $SG_InfraAdmins,
-            $SG_AdAdmins,
-            $SG_T0SA,
-            $SG_T1SA,
-            $SG_T2SA,
-            $SG_GpoAdmins,
-            $SG_Tier0Admins,
-            $SG_Tier1Admins,
-            $SG_Tier2Admins,
-            $SG_AllSiteAdmins,
-            $SG_AllGALAdmins
-        )
-
         # Move the groups to PG OU
         foreach($item in $AllGroups) {
             # Remove the ProtectedFromAccidentalDeletion, otherwise throws error when moving
-            $item | Set-ADObject -ProtectedFromAccidentalDeletion $false
+            Get-ADGroup -Identity $item | Set-ADObject -ProtectedFromAccidentalDeletion $false
 
             # Move objects to PG OU
-            $item | Move-ADObject -TargetPath $ItPGOuDn
+            Get-ADGroup -Identity $item | Move-ADObject -TargetPath $ItPGOuDn
 
             # Set back again the ProtectedFromAccidentalDeletion flag.
             #The group has to be fetch again because of the previus move
-            Get-ADGroup -Identity $item.SamAccountName | Set-ADObject -ProtectedFromAccidentalDeletion $true
+            Get-ADGroup -Identity $item | Set-ADObject -ProtectedFromAccidentalDeletion $true
         }
 
         #endregion
